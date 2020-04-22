@@ -76,8 +76,8 @@ Weight = [];
 
 % [Measured Errors Weight Normal] = mergedata(handles.Stations);
 
-for i=1:length(handles.Stations)
-    for j=1:length(handles.Sensors)
+for j=1:length(handles.Sensors)
+    for i=1:length(handles.Stations)
         if strcmp(handles.Stations(i).Name,handles.Sensors(j).Name)
             if strcmp(handles.Sensors(j).Type,'Paxes')
                 ad = angleBetweenAxis(handles.Sensors(j).Measurements(1),handles.Sensors(j).Measurements(2), handles.Stations(i).Measurements(1),handles.Stations(i).Measurements(2));
@@ -94,7 +94,7 @@ for i=1:length(handles.Stations)
                 Measured = [Measured; handles.Stations(i).Measurements(:)];
                 MeasureErrors = [MeasureErrors; handles.Stations(i).Errors(:)];
                 Weight = [Weight; ones(size(handles.Stations(i).Measurements(:)))*handles.Stations(i).Weight];
-            end
+            end        
         end
     end
 end

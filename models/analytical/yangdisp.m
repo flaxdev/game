@@ -1,4 +1,4 @@
-function [Ux Uy Uz] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y,z)
+function [Ux, Uy, Uz] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y,z)
 % compute the 3D displacement due to a pressurized ellipsoid  
 %
 % IN

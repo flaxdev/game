@@ -22,7 +22,7 @@ function varargout = main(varargin)
 
 % Edit the above text to modify the response to help main
 
-% Last Modified by GUIDE v2.5 11-Mar-2019 17:32:29
+% Last Modified by GUIDE v2.5 22-Apr-2020 11:47:04
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -61,6 +61,8 @@ handles.ParamHandles = [];
 handles.Population = [];
 handles.NEstimation = 1000;
 handles.EarthQuakes = [];
+handles.SourcesHistory = [];
+handles.SourcesHistoryLength = 30;
 
 
 a = get(handles.gapanel,'Position');
@@ -265,9 +267,20 @@ handles.ParamHandles = [];
 isource = get(handles.sourcelist,'Value');
 
 
+
 if (~isempty(get(handles.sourcelist,'String'))) && (~isempty(handles.Sources))
         
-    
+    if length(get(handles.sourcelist,'String')) ~= length(handles.Sources)
+        
+        for i=1:length(handles.Sources)
+            listtype{i} = handles.Sources(i).Type;
+        end
+        set(handles.sourcelist,'String',listtype);
+        set(handles.sourcelist,'Value',1);
+        
+        isource = 1;
+    end
+
     if isempty(isource) ||  (isource<=0) 
         set(handles.sourcelist,'Value',1);
         isource = 1;
@@ -946,6 +959,10 @@ function goinversion_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if not(isempty(handles.Sources)) && not(isempty(handles.Stations))
+    handles.SourcesHistory{end+1} = handles.Sources;
+    if length(handles.SourcesHistory) > handles.SourcesHistoryLength
+        handles.SourcesHistory(1) = [];
+    end
     handles.Sources = solveGA(handles.Sources, handles.Stations, handles.GAparameters, handles.Terrain, get(handles.isconstrained,'Value'), handles.ObjFunction);
     guidata(hObject, handles);
     displayParameters(hObject, eventdata, handles);
@@ -2678,10 +2695,30 @@ else
         colorbar('location','southoutside');
         hold on
         mxh = max(max(DN(:,:,i)))+1;
-        for is=1:length(handles.Sensors)
-            plot3(handles.Sensors(is).Coordinates(2),handles.Sensors(is).Coordinates(1), mxh, 'LineStyle','none','Marker','o','MarkerSize',5,'MarkerEdgeColor','k','MarkerFaceColor','r')
-            text(handles.Sensors(is).Coordinates(2)+20,handles.Sensors(is).Coordinates(1), mxh,handles.Sensors(is).Name);
+%         for is=1:length(handles.Sensors)
+%             plot3(handles.Sensors(is).Coordinates(2),handles.Sensors(is).Coordinates(1), mxh, 'LineStyle','none','Marker','o','MarkerSize',5,'MarkerEdgeColor','k','MarkerFaceColor','r')
+%             text(handles.Sensors(is).Coordinates(2)+20,handles.Sensors(is).Coordinates(1), mxh,handles.Sensors(is).Name);
+%         end
+
+if get(handles.drawsources,'Value')
+    for j=1:length(handles.Sources)
+        
+        [sX,sY,~] = getSourceGraph(handles.Sources(j));
+        if strcmp(handles.Sources(j).Type,'Okada')
+            
+            p1 = surf(sX,sY,max(max(DN(:,:,i)))*ones(size(sX)),...
+                'FaceColor','none','EdgeColor','k');
+        elseif strcmp(handles.Sources(j).Type,'OkadaXS')
+             p1 = surf(sX,sY,max(max(DN(:,:,i)))*ones(size(sX)),...
+                'FaceColor','red','EdgeColor','k');          
+        else
+            p1 = surf(sX,sY,max(max(DN(:,:,i)))*ones(size(sX)),...
+                'FaceColor','red','EdgeColor','none');
         end
+    end
+end
+
+
         hold off
         shading interp
         axis xy; axis tight; colormap(jet); view(0,90);
@@ -2798,7 +2835,7 @@ for iE= 1:Esteps
             O = 0;
             for i=1:length(handles.Sources)
                 hand = mapModel(newDisplacementStation());
-                o = hand(handles.Sources(i).Parameters,Coordinates, handles.Terrain);
+                o = hand(handles.Sources(i),Coordinates, handles.Terrain);
                 O = O + o;
             end
             DN(iE,iN,iU) = O(1);
@@ -3018,7 +3055,7 @@ if get(handles.drawvectors,'Value')
     if ~isempty(x)
         if length(x)==1
             if length(handles.Stations)==1
-                scala = 1000;
+                scala = 10000;
             else
                 xx=[];yy=[];zz=[];
                 for ii=1:length(handles.Stations)
@@ -3026,10 +3063,10 @@ if get(handles.drawvectors,'Value')
                     yy = [yy,handles.Stations(ii).Coordinates(1)];
                     zz = [zz,handles.Stations(ii).Coordinates(3)];                    
                 end
-            end
             maxdist = max(pdist([xx;yy;zz]'));
             maxleng = max(norm([u;v;w]'));
             scala =  0.2*maxdist/maxleng;
+            end
         else
             maxdist = max(pdist([x;y;z]'));
             maxleng = max(norm([u;v;w]'));
@@ -3046,7 +3083,7 @@ if get(handles.drawvectors,'Value')
         end
         
         if ~isempty(scala) && isfinite(scala) && scala>0
-            quiver3(x,y,z,u*scala,v*scala,w*scala,0,'k','LineWidth',2,'MarkerSize',2);
+            quiver3(x,y,z,u*scala,v*scala,w*scala,0,'k','LineWidth',2,'MarkerSize',2,'ShowArrowHead','on');
         end
     end
     x=[];y=[];z=[];u=[];v=[];w=[];
@@ -3781,6 +3818,10 @@ function PSearch_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if not(isempty(handles.Sources)) && not(isempty(handles.Stations))
+    handles.SourcesHistory{end+1} = handles.Sources;
+    if length(handles.SourcesHistory) > handles.SourcesHistoryLength
+        handles.SourcesHistory(1) = [];
+    end
     handles.Sources = solvePS(handles.Sources, handles.Stations, handles.PSparameters, handles.Terrain, get(handles.isPSconstrained,'Value'), handles.ObjFunction);
     guidata(hObject, handles);
     displayParameters(hObject, eventdata, handles);
@@ -4068,7 +4109,7 @@ for i=1:length(handles.Stations)
     for s=1:length(MySource)
         ranges = (MySource(s).UpBoundaries - MySource(s).LowBoundaries);
         randvals = ranges.*rand(1,MySource(s).NParameters) + MySource(s).LowBoundaries;
-        MySource(s).Parameters = (randvals + MySource(s).Parameters)/2;
+        MySource(s).Parameters = randvals;
         MySource(s).Parameters(not(MySource(s).ActiveParameters)) = handles.Sources(s).Parameters(not(MySource(s).ActiveParameters));
     end
     MyStation(i) = [];
@@ -4089,7 +4130,7 @@ end
 p = 0;
 close(hwb);
 
-okdone = prctile(ObjX,99.7); %3-sigma
+okdone = prctile(ObjX,99.8); %3-sigma
 iok = find((ObjX<okdone) & (ObjX<fval0*1.5));
 
 n = length(iok);
@@ -4099,13 +4140,23 @@ for i=1:length(handles.Sources)
     p = p + handles.Sources(i).NParameters;
 end
 
+% for i=1:length(handles.Sources)
+%     for j=1:handles.Sources(i).NParameters
+%         T = [];
+%         for k=1:length(MySources)
+%             T(k) = MySources{k}(i).Parameters(j);
+%         end
+%         handles.Sources(i).EParameters(j) = sqrt((n-1)/n)*iqr(T)/1.349; % fonte http://en.wikipedia.org/wiki/Interquartile_range
+%     end
+% end
+
 for i=1:length(handles.Sources)
     for j=1:handles.Sources(i).NParameters
         T = [];
         for k=1:length(MySources)
-            T(k) = MySources{k}(i).Parameters(j);
+            T(k) = abs(MySources{k}(i).Parameters(j)-MySource(i).Parameters(j));
         end
-        handles.Sources(i).EParameters(j) = sqrt((n-1)/n)*iqr(T)/1.349; % fonte http://en.wikipedia.org/wiki/Interquartile_range
+        handles.Sources(i).EParameters(j) = prctile(T,68);
     end
 end
 
@@ -4647,11 +4698,11 @@ if ~isempty(get(handles.sourcelist,'String'))
                     x0 = XX(i);
                     y0 = YY(i);
                     z0 = MainOkada.Parameters(3) - wid*(i-1)*sind(MainOkada.Parameters(5));
-                    x1 = x0 + MainOkada.Parameters(6)*cosd(90 - MainOkada.Parameters(4));
-                    y1 = y0 + MainOkada.Parameters(6)*sind(90 - MainOkada.Parameters(4));
+                    x1 = x0 + MainOkada.Parameters(6)*cosd(90 - MainOkada.Parameters(4))/2;
+                    y1 = y0 + MainOkada.Parameters(6)*sind(90 - MainOkada.Parameters(4))/2;
                     
-                    x2 = x0 - MainOkada.Parameters(6)*cosd(90 - MainOkada.Parameters(4));
-                    y2 = y0 - MainOkada.Parameters(6)*sind(90 - MainOkada.Parameters(4));
+                    x2 = x0 - MainOkada.Parameters(6)*cosd(90 - MainOkada.Parameters(4))/2;
+                    y2 = y0 - MainOkada.Parameters(6)*sind(90 - MainOkada.Parameters(4))/2;
                     
                     xx = linspace(x1,x2,2*ncols+1); xx = xx(2:2:end);
                     yy = linspace(y1,y2,2*ncols+1); yy = yy(2:2:end);
@@ -4946,7 +4997,10 @@ function invertnlsq_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if not(isempty(handles.Sources)) && not(isempty(handles.Stations))
-    
+    handles.SourcesHistory{end+1} = handles.Sources;
+    if length(handles.SourcesHistory) > handles.SourcesHistoryLength
+        handles.SourcesHistory(1) = [];
+    end    
     handles.Sources = solveNLSQ(handles.Sources, handles.Stations, handles.PSparameters, handles.Terrain, get(handles.isNLSconstrained,'Value'));
     guidata(hObject, handles);
     displayParameters(hObject, eventdata, handles);
@@ -6462,3 +6516,304 @@ set(handles.sourcelist,'String',ss);
 set(handles.sourcelist,'Value',1);
 guidata(hObject, handles);
 displayParameters(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function removeHeight_Callback(hObject, eventdata, handles)
+% hObject    handle to removeHeight (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+Extr = [];
+Nxtr = [];
+h = msgbox('Please Wait ...','modal') ;
+
+for i=1:length(handles.Stations)
+    if strcmp(handles.Stations(i).Type,'Baseline')
+        Extr = [Extr; handles.Stations(i).Coordinates([2 5])', handles.Stations(i).Coordinates([2 5])'];
+        Nxtr = [Nxtr; handles.Stations(i).Coordinates([1 4])', handles.Stations(i).Coordinates([1 4])'];
+    else
+        Extr = [Extr; handles.Stations(i).Coordinates(2), handles.Stations(i).Coordinates(2)];
+        Nxtr = [Nxtr; handles.Stations(i).Coordinates(1), handles.Stations(i).Coordinates(1)];
+    end
+end
+
+for i=1:length(handles.Sensors)
+    if strcmp(handles.Sensors(i).Type,'Baseline')
+        Extr = [Extr; handles.Sensors(i).Coordinates([2 5])', handles.Sensors(i).Coordinates([2 5])'];
+        Nxtr = [Nxtr; handles.Sensors(i).Coordinates([1 4])', handles.Sensors(i).Coordinates([1 4])'];
+    else
+        Extr = [Extr; handles.Sensors(i).Coordinates(2), handles.Sensors(i).Coordinates(2)];
+        Nxtr = [Nxtr; handles.Sensors(i).Coordinates(1), handles.Sensors(i).Coordinates(1)];
+    end
+end
+
+Eminmax = minmax(Extr(:)');
+Nminmax = minmax(Nxtr(:)');
+
+Eminmax = Eminmax + 0.15*[-1 1]*(Eminmax*[-1;1]);
+Nminmax = Nminmax + 0.15*[-1 1]*(Nminmax*[-1;1]);
+
+xi = [];
+yi = [];
+for i=1:length(handles.Stations)
+    if strcmp(handles.Stations(i).Type,'Baseline')
+        xi(end+1) = handles.Stations(i).Coordinates(2);
+        yi(end+1) = handles.Stations(i).Coordinates(1);
+        xi(end+1) = handles.Stations(i).Coordinates(5);
+        yi(end+1) = handles.Stations(i).Coordinates(4);
+    else
+        xi(end+1) = handles.Stations(i).Coordinates(2);
+        yi(end+1) = handles.Stations(i).Coordinates(1);
+    end
+end
+
+if ~isempty(xi)
+    zi = 0;
+    
+    j = 1;
+    for i=1:length(handles.Stations)
+        if strcmp(handles.Stations(i).Type,'Baseline')
+            handles.Stations(i).Coordinates(3) = zi; j=j+1;
+            handles.Stations(i).Coordinates(6) = zi; j=j+1;
+        else
+            handles.Stations(i).Coordinates(3) = zi; j=j+1;
+        end
+    end
+end
+
+xi = [];
+yi = [];
+for i=1:length(handles.Sensors)
+    if strcmp(handles.Sensors(i).Type,'Baseline')
+        xi(end+1) = handles.Sensors(i).Coordinates(2);
+        yi(end+1) = handles.Sensors(i).Coordinates(1);
+        xi(end+1) = handles.Sensors(i).Coordinates(5);
+        yi(end+1) = handles.Sensors(i).Coordinates(4);
+    else
+        xi(i) = handles.Sensors(i).Coordinates(2);
+        yi(i) = handles.Sensors(i).Coordinates(1);
+    end
+end
+
+if ~isempty(xi)
+    zi = 0;
+    
+    j = 1;
+    for i=1:length(handles.Sensors)
+        if strcmp(handles.Stations(i).Type,'Baseline')
+            handles.Sensors(i).Coordinates(3) = zi; j=j+1;
+            handles.Sensors(i).Coordinates(6) = zi; j=j+1;
+        else
+            handles.Sensors(i).Coordinates(3) = zi; j=j+1;
+        end
+    end
+end
+
+close(h);
+guidata(hObject, handles);
+displayMeasurements(hObject, eventdata, handles);
+displaySensors(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function addnoise2measures_Callback(hObject, eventdata, handles)
+% hObject    handle to addnoise2measures (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+h = msgbox('Please Wait ...','modal') ;
+
+if ~isempty(get(handles.stationlist,'String'))
+    
+    I = get(handles.stationlist,'Value');
+    if ~isempty(I)
+        for i=1:length(I)
+            handles.Stations(I(i)).Measurements = ...
+                handles.Stations(I(i)).Measurements + randn(1,length(handles.Stations(I(i)).Errors)).*handles.Stations(I(i)).Errors;
+        end
+        guidata(hObject, handles);
+        displayMeasurements(hObject, eventdata, handles);
+    end
+end
+
+close(h);
+
+
+function [C, Pnames] = calculateParamsCovariance(hObject, eventdata, handles, whatalgorithm)
+
+MySources = [];
+ObjX = [];
+n = 0;
+howmany = length(handles.Stations);
+
+[~, fval0] = ForwardModel(handles);
+hwb = waitbar(0,'Residual Time Inf');
+tic;
+for i=1:length(handles.Stations)
+    MyStation = handles.Stations;
+    MySource = handles.Sources;
+    for s=1:length(MySource)
+        ranges = (MySource(s).UpBoundaries - MySource(s).LowBoundaries);
+        randvals = ranges.*randn(1,MySource(s).NParameters)/5 + MySource(s).Parameters;
+        ino = randvals<MySource(s).LowBoundaries;
+        randvals( ino ) = MySource(s).LowBoundaries(ino);
+        ino = randvals>MySource(s).UpBoundaries;
+        randvals( ino ) = MySource(s).UpBoundaries(ino);
+        MySource(s).Parameters = randvals;
+        MySource(s).Parameters(not(MySource(s).ActiveParameters)) = handles.Sources(s).Parameters(not(MySource(s).ActiveParameters));
+    end
+    MyStation(i) = [];
+    if strcmp(whatalgorithm,'GA')
+        [os, fval]= solveGA(MySource, MyStation, handles.GAparameters, handles.Terrain, get(handles.isconstrained,'Value'), handles.ObjFunction);
+    elseif strcmp(whatalgorithm,'PS')
+        [os, fval]= solvePS(MySource, MyStation, handles.PSparameters, handles.Terrain, get(handles.isPSconstrained,'Value'), handles.ObjFunction);
+    elseif strcmp(whatalgorithm,'NLSQ')
+        [os, fval]= solveNLSQ(MySource, handles.Stations, handles.PSparameters, handles.Terrain, get(handles.isNLSconstrained,'Value'));
+    end
+    if os.Parameters(7)<0
+        fdsf=3;
+    end
+    MySources{i} = os;
+    ObjX(i) = fval;
+    temp = toc;
+    totaltemp = temp/(n+i);
+    totaltemp = totaltemp*(howmany-n-i)/60;
+    waitbar((n+i)/howmany,hwb,['Residual Time ',num2str(totaltemp,0),' minutes']);
+end
+close(hwb);
+
+okdone = prctile(ObjX,99.8); %3-sigma
+iok = find((ObjX<okdone) & (ObjX<fval0*1.5));
+
+n = length(iok);
+MySources = MySources(iok);
+
+
+p = 0;
+for i=1:length(handles.Sources)
+    p = p + sum(handles.Sources(i).ActiveParameters);
+end
+
+
+P = nan(length(MySources),p);
+Pnames = cell(1,p);
+for k=1:length(MySources)
+    ip = 0;
+    for i=1:length(handles.Sources)
+       iac = handles.Sources(i).ActiveParameters>0;
+       pars = MySources{k}(i).Parameters(iac);
+       ip = ip+1;
+       P(k,ip:(ip+sum(iac)-1)) = pars;
+       if k==1
+           Pnames(ip:(ip+sum(iac)-1)) = MySources{k}(i).ParameterNames(iac);
+       end
+    end
+end
+
+C = corrcoef(P);
+
+
+figure,corrplot(P,'varNames',Pnames,'type','Pearson');
+
+
+
+% --------------------------------------------------------------------
+function parcovariance_Callback(hObject, eventdata, handles)
+% hObject    handle to parcovariance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+[C, Pnames] = calculateParamsCovariance(hObject, eventdata, handles, 'NLSQ');
+
+
+% --- Executes on button press in sensors2stations.
+function sensors2stations_Callback(hObject, eventdata, handles)
+% hObject    handle to sensors2stations (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+I = get(handles.sensorlist,'Value');
+if ~isempty(I)
+    for i=1:length(I)
+        handles.Stations  = [handles.Stations, handles.Sensors(I(i))];
+    end
+end
+
+for i=1:length(handles.Stations)
+    listtype{i} = handles.Stations(i).Name;
+end
+if ~isempty(handles.Stations)
+    set(handles.stationlist,'String',listtype);
+    set(handles.stationlist,'Value',1);
+end
+guidata(hObject, handles);
+displayMeasurements(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function duplicatestation_Callback(hObject, eventdata, handles)
+% hObject    handle to duplicatestation (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+I = get(handles.stationlist,'Value');
+if ~isempty(I)
+    for i=1:length(I)
+        answer=inputdlg('Name','Station',1,{[handles.Stations(I(i)).Name,'c']});
+        handles.Stations  = [handles.Stations, handles.Stations(I(i))];
+        handles.Stations(end).Name = answer{1};
+    end
+end
+
+for i=1:length(handles.Stations)
+    listtype{i} = handles.Stations(i).Name;
+end
+if ~isempty(handles.Stations)
+    set(handles.stationlist,'String',listtype);
+    set(handles.stationlist,'Value',1);
+end
+guidata(hObject, handles);
+displayMeasurements(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function duplicatesensor_Callback(hObject, eventdata, handles)
+% hObject    handle to duplicatesensor (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+I = get(handles.sensorlist,'Value');
+if ~isempty(I)
+    for i=1:length(I)
+        answer=inputdlg('Name','Sensor',1,{[handles.Sensors(I(i)).Name,'c']});
+        handles.Sensors  = [handles.Sensors, handles.Sensors(I(i))];
+        handles.Sensors(end).Name = answer{1};
+    end
+end
+
+for i=1:length(handles.Sensors)
+    listtype{i} = handles.Sensors(i).Name;
+end
+if ~isempty(handles.Sensors)
+    set(handles.sensorlist,'String',listtype);
+    set(handles.sensorlist,'Value',1);
+end
+guidata(hObject, handles);
+displaySensors(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function undoinversion_Callback(hObject, eventdata, handles)
+% hObject    handle to undoinversion (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if not(isempty(handles.SourcesHistory))
+    handles.Sources = handles.SourcesHistory{end};
+    handles.SourcesHistory(end) = [];
+    
+    guidata(hObject, handles);
+    displayParameters(hObject, eventdata, handles);
+
+end
+

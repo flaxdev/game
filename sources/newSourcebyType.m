@@ -9,7 +9,7 @@ elseif strcmp(type,'MogiPressure')
 elseif strcmp(type,'Okada')
     S = newOkadaSource();
 elseif strcmp(type,'OkadaDensity')
-    S = newOkadaDensity();
+    S = newOkadaDensitySource();
 elseif strcmp(type,'OkadaXS')
     S = newOkadaXSSource();
 elseif strcmp(type,'OkadaOnFault')
